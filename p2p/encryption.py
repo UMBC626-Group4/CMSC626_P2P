@@ -1,11 +1,4 @@
-import threading
-import socket
-import json
-import base64
-import zlib
-import bz2
-import lzma
-a# ############################################
+# ############################################
 # Created by: Josh Li
 # Date      : 2023
 # Class     : CMSC 626
@@ -37,5 +30,3 @@ class node_connection_encryption(node_connection):
         except Exception as e:
             self.parent_node.debug_message(f"Decryption error: {e}")
             return None
-def send_data(self, data_payload, encoding_format="utf-8", compression_algorithm='none'):
-	try
