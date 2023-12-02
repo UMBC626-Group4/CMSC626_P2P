@@ -1,5 +1,5 @@
 # ############################################
-# Created by: Shawn
+# Created by: Shawn, Ashish
 # Date      : 2023
 # Class     : CMSC 626
 # Project   : P2P
@@ -19,16 +19,14 @@ import sys
 import ipaddress
 import hashlib
 
-
-from threading import *
 import pickle
 import random
-from p2p.nodeconnection import nodeconnection
+from p2pnetwork.nodeconnection import NodeConnection
 
 class node(threading.Thread):
 
-    self.inbound_nodes = {}
-    self.outbound_nodes = {}
+    inbound_nodes = {}
+    outbound_nodes = {}
     
     def __init__(self, node_host, node_port, node_id=None, event_callback=None, max_peers=1):
 
@@ -72,17 +70,17 @@ class node(threading.Thread):
 
     def run(self):
     	while not self.stop_event.is_set():
-    	   try:
-               connection, address = self.server_socket.accept()
-               if len(self.all_nodes) < self.max_peers:
-                   self._log_debug(f"Connection from {address}")
-                   node_connection = NodeConnection(self, connection, address)
-                   node_id = node_connection.node_id  # assuming NodeConnection has a node_id attribute
-                   self.inbound_nodes[node_id] = (node_connection, address)
-                   node_connection.start()
-           except socket.timeout:
+            try:
+                connection, address = self.server_socket.accept()
+                if len(self.all_nodes) < self.max_peers:
+                    self._log_debug(f"Connection from {address}")
+                    node_connection = NodeConnection(self, connection, address)
+                    node_id = node_connection.node_id  # assuming NodeConnection has a node_id attribute
+                    self.inbound_nodes[node_id] = (node_connection, address)
+                    node_connection.start()
+            except socket.timeout:
                 pass
-           except Exception as e:
+            except Exception as e:
                 self._log_debug(f"Error: {e}")
 
     def stop(self):
@@ -93,19 +91,19 @@ class node(threading.Thread):
             self.send(node, message)
 
     def send(self, node, message):
-    raise NotImplementedError("Send method not implemented yet.")
+        raise NotImplementedError("Send method not implemented yet.")
 
     def connect(self, node_host, node_port):
-    connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    connection.connect((node_host, node_port))
-    node_connection = NodeConnection(self, connection, (node_host, node_port))
-    node_id = node_connection.node_id  # assuming NodeConnection has a node_id attribute
-    self.outbound_nodes[node_id] = (node_connection, (node_host, node_port))
-    node_connection.start()
-
+        connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        connection.connect((node_host, node_port))
+        node_connection = NodeConnection(self, connection, (node_host, node_port))
+        node_id = node_connection.node_id  # assuming NodeConnection has a node_id attribute
+        self.outbound_nodes[node_id] = (node_connection, (node_host, node_port))
+        node_connection.start()
 
     def __str__(self):
         return f'node: {self.node_host}:{self.node_port}'
 
-    def __repr__(self): ID: {self.node_id}>'
+    def __repr__(self):
+        return f'node: {self.node_host}:{self.node_id}:{self.node_id}'
 
