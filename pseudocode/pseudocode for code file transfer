@@ -32,10 +32,16 @@ Method for hashing file with file path parameter
                     delete file registry[file hash]
     
 Method to add file path
-        file_name = os.path.basename(file_path)
+        file name = os.path.basename(file_path)
         file_hash = self.hash_file(file_path)
         self.file_registry[file_hash] = {"name": file_name, "path": file_path}
-        return str(file_hash)
+        return string of file_hash 
+
+Method that defines files:
+      defined varibles that refreshes files
+        return file hash infile registry
+
+
 
 
 
