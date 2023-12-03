@@ -1,1 +1,45 @@
+imported libraries for needed file transfers
+
+FileManager class:
+    def __init__(self):
+       file_registry = empty
+        .download_directory = ""
+
+def hash_data(self, data): // computes md5 hash of input data
+       declared hashing type md5hasher = hashlib
+       hashing type updates (data)
+        md5_hasher.update(data)
+        return string of md5 hasher
+   
+Method for hashing file with file path parameter 
+        md5_hasher = hashlib.md5()
+        try:
+            with open(file_path, "rb") as file:
+                buffer = file.read()
+                while length of (buffer) > 0:
+                    md5_hasher will update (buffer)
+                    buffer = file.read()
+            return value of md5_hasher.hexdigest()
+
+        except FileNotFoundError:
+            print(File not found for hashing: with file_path)
+
+    Method to refresh files
+        for filehash in list of fileregistry:
+            if file_registry[file_hash]["path"] is not empty:
+                if os.path does not exists:
+                    print(Removing missing file:)
+                    delete file registry[file hash]
+    
+Method to add file path
+        file_name = os.path.basename(file_path)
+        file_hash = self.hash_file(file_path)
+        self.file_registry[file_hash] = {"name": file_name, "path": file_path}
+        return str(file_hash)
+
+
+
+
+
+
 
