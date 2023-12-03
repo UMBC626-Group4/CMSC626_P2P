@@ -1,0 +1,106 @@
+Class NodeConnection(Thread):
+    Initialize:
+        Set parent_host, parent_port, parent_node, connection_socket, terminate_event, connected_node_id
+        Set END_OF_TRANSMISSION, COMPRESSION_INDICATOR, additional_info
+        Set connection timeout to 10.0 seconds
+
+    Method apply_compression(data_payload, compression_algorithm):
+        Try:
+            If compression_algorithm is 'zlib':
+                Compress data_payload using zlib, encode in base64, and append 'zlib'
+            Else if compression_algorithm is 'bzip2':
+                Compress data_payload using bzip2, encode in base64, and append 'bzip2'
+            Else if compression_algorithm is 'lzma':
+                Compress data_payload using lzma, encode in base64, and append 'lzma'
+            Else:
+                Log error for unknown compression algorithm
+                Return None
+        Except Exception as error:
+            Log compression error
+            Return None
+
+    Method apply_decompression(compressed_payload):
+        Try:
+            Decode compressed_payload from base64
+            If compressed_payload ends with 'zlib':
+                Decompress using zlib
+            Else if compressed_payload ends with 'bzip2':
+                Decompress using bzip2
+            Else if compressed_payload ends with 'lzma':
+                Decompress using lzma
+            Else:
+                Return compressed_payload
+        Except Exception as error:
+            Log decompression error
+            Return None
+
+    Method send_data(data_payload, encoding_format='utf-8', compression_algorithm='none'):
+        Try:
+            If data_payload is str:
+                Encode data_payload in specified encoding_format
+            Else if data_payload is dict:
+                Convert data_payload to JSON, encode in specified encoding_format
+            Else if data_payload is not bytes:
+                Log error for invalid data type
+                Return
+
+            If compression_algorithm is not 'none':
+                Compress data_payload using apply_compression
+                If compressed_data exists:
+                    Send compressed_data + COMPRESSION_INDICATOR + END_OF_TRANSMISSION
+            Else:
+                Send data_payload + END_OF_TRANSMISSION
+        Except Exception as e:
+            Log send data error
+            Terminate connection
+
+    Method terminate_connection():
+        Set terminate_event
+
+    Method interpret_received_packet(packet_payload):
+        If packet_payload ends with COMPRESSION_INDICATOR:
+            Apply decompression to packet_payload excluding the indicator
+        Try:
+            Decode packet_payload to UTF-8
+            Return JSON.loads(packet_payload) or packet_payload if decoding fails
+        Except UnicodeDecodeError or JSONDecodeError:
+            Return packet_payload
+
+    Method run():
+        Initialize data_buffer as empty bytes
+        While not terminate_event is set:
+            Try:
+                Receive chunk from connection_socket (buffer size: 4096)
+                If received_chunk is not empty:
+                    Append received_chunk to data_buffer
+                    Find position of END_OF_TRANSMISSION in data_buffer
+                    While END_OF_TRANSMISSION is found in data_buffer:
+                        Extract packet from data_buffer until END_OF_TRANSMISSION
+                        Update data_buffer to exclude processed data
+                        Increment message_count_recv in parent_node
+                        Process received message using interpret_received_packet
+            Except socket.timeout or Exception as e:
+                Set terminate_event
+                Log error in connection thread
+
+        Close connection_socket
+        Notify parent_node about disconnected node
+        Log "NodeConnection: Stopped"
+
+    Method set_additional_info(key, value):
+        Set value in additional_info dictionary with key
+
+    Method get_additional_info(key):
+        Return value from additional_info dictionary for key, or None if key not found
+
+    Method get_connection_string():
+        Return formatted connection string with parent_node address, port, connected_host, connected_port, and connected_node_id
+
+    Method get_detailed_representation():
+        Return formatted detailed representation with parent_node address, port, connected_host, connected_port, and connected_node_id
+
+    Method generate_hash_from_node_ids():
+        Return hash of concatenated main_node_id and connected_node_id
+
+    Method are_nodes_equal(other_node):
+        Return True if main_node and connected_node_id are equal between self and other_node, else False
