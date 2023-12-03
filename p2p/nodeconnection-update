@@ -1,0 +1,129 @@
+import threading
+import socket
+import json
+import base64
+import zlib
+import bz2
+import lzma
+
+class NodeConnection(threading.Thread):
+    def __init__(self, parent_node, connection_socket, node_id, parent_host, parent_port):
+        super(NodeConnection, self).__init__()
+        self.parent_host = parent_host
+        self.parent_port = parent_port
+        self.parent_node = parent_node
+        self.connection_socket = connection_socket
+        self.terminate_event = threading.Event()
+        self.connected_node_id = str(node_id)
+        self.END_OF_TRANSMISSION = b'\x04'
+        self.COMPRESSION_INDICATOR = b'\x02'
+        self.additional_info = {}
+        self.connection_socket.settimeout(10.0)
+
+        self.parent_node.debug_message(
+            f"NodeConnection: Started with client ({self.connected_node_id}) '{self.parent_host}:{self.parent_port}'")
+
+    def apply_compression(self, data_payload, compression_algorithm):
+        try:
+            if compression_algorithm == 'zlib':
+                return base64.b64encode(zlib.compress(data_payload, 6) + b'zlib')
+            elif compression_algorithm == 'bzip2':
+                return base64.b64encode(bz2.compress(data_payload) + b'bzip2')
+            elif compression_algorithm == 'lzma':
+                return base64.b64encode(lzma.compress(data_payload) + b'lzma')
+            else:
+                self.parent_node.debug_message(f"{self.connected_node_id}: Unknown compression algorithm")
+                return None
+        except Exception as error:
+            self.parent_node.debug_message(f"Compression error: {error}")
+            return None
+
+    def apply_decompression(self, compressed_payload):
+        try:
+            decompressed_data = base64.b64decode(compressed_payload)
+            if decompressed_data.endswith(b'zlib'):
+                return zlib.decompress(decompressed_data[:-4])
+            elif decompressed_data.endswith(b'bzip2'):
+                return bz2.decompress(decompressed_data[:-5])
+            elif decompressed_data.endswith(b'lzma'):
+                return lzma.decompress(decompressed_data[:-4])
+            else:
+                return decompressed_data
+        except Exception as error:
+            self.parent_node.debug_message(f"Decompression error: {error}")
+            return None
+
+    def send_data(self, data_payload, encoding_format='utf-8', compression_algorithm='none'):
+        try:
+            if isinstance(data_payload, str):
+                data_payload = data_payload.encode(encoding_format)
+            elif isinstance(data_payload, dict):
+                data_payload = json.dumps(data_payload).encode(encoding_format)
+            elif not isinstance(data_payload, bytes):
+                self.parent_node.debug_message('Invalid data type, please use str, dict or bytes')
+                return
+
+            if compression_algorithm != 'none':
+                compressed_data = self.apply_compression(data_payload, compression_algorithm)
+                if compressed_data:
+                    self.connection_socket.sendall(compressed_data + self.COMPRESSION_INDICATOR + self.END_OF_TRANSMISSION)
+            else:
+                self.connection_socket.sendall(data_payload + self.END_OF_TRANSMISSION)
+        except Exception as e:
+            self.parent_node.debug_message(f"Send data error: {e}")
+            self.terminate_connection()
+
+    def terminate_connection(self):
+        self.terminate_event.set()
+
+    def interpret_received_packet(self, packet_payload):
+        if packet_payload.endswith(self.COMPRESSION_INDICATOR):
+            packet_payload = self.apply_decompression(packet_payload[:-1])
+
+        try:
+            packet_payload_decoded = packet_payload.decode('utf-8')
+            return json.loads(packet_payload_decoded)
+        except (UnicodeDecodeError, json.decoder.JSONDecodeError):
+            return packet_payload
+
+    def run(self):
+        data_buffer = b''
+        while not self.terminate_event.is_set():
+            try:
+                received_chunk = self.connection_socket.recv(4096)
+                if received_chunk:
+                    data_buffer += received_chunk
+                    end_pos = data_buffer.find(self.END_OF_TRANSMISSION)
+                    while end_pos > 0:
+                        packet = data_buffer[:end_pos]
+                        data_buffer = data_buffer[end_pos + 1:]
+                        self.parent_node.message_count_recv += 1
+                        self.parent_node.process_received_message(self, self.interpret_received_packet(packet))
+                        end_pos = data_buffer.find(self.END_OF_TRANSMISSION)
+            except (socket.timeout, Exception) as e:
+                self.terminate_event.set()
+                self.parent_node.debug_message(f"Error in connection thread: {e}")
+
+        self.connection_socket.close()
+        self.parent_node.notify_disconnected_node(self)
+        self.parent_node.debug_message("NodeConnection: Stopped")
+
+    def set_additional_info(self, key, value):
+        self.additional_info[key] = value
+
+    def get_additional_info(self, key):
+        return self.additional_info.get(key, None)
+
+    def get_connection_string(self):
+        return (f'NodeConnection: {self.parent_node.address}:{self.parent_node.port} <-> '
+                f'{self.connected_host}:{self.connected_port} (Node ID: {self.connected_node_id})')
+
+    def get_detailed_representation(self):
+        return (f'<NodeConnection: Main Node {self.parent_node.address}:{self.parent_node.port} <-> '
+                f'Connected Node {self.connected_host}:{self.connected_port}>')
+
+    def generate_hash_from_node_ids(self):
+        return hash(f'{self.parent_node.node_id}{self.connected_node_id}')
+
+    def are_nodes_equal(self, other_node):
+        return self.parent_node == other_node.parent_node and self.connected_node_id == other_node.connected_node_id
