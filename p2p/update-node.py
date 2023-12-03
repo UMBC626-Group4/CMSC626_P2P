@@ -27,9 +27,6 @@ import random
 from p2pnetwork.nodeconnection import NodeConnection
 
 class node(threading.Thread):
-
-    #inbound_nodes = {}
-    #outbound_nodes = {}
     
     def __init__(self, node_host, node_port, node_id=None, event_callback=None, max_peers=1):
 
@@ -72,15 +69,19 @@ class node(threading.Thread):
         self.server_socket.listen(1)
 
     def run(self):
-    	while not self.stop_event.is_set():
+        while not self.stop_event.is_set():
             try:
                connection, address = self.server_socket.accept()
                if len(self.all_nodes) < self.max_peers:
                    self._log_debug(f"Connection from {address}")
                    node_connection = NodeConnection(self, connection, address)
-                   node_id = node_connection.node_id  # assuming NodeConnection has a node_id attribute
-                   self.inbound_nodes[node_id] = (node_connection, address)
                    node_connection.start()
+
+                   node_id = node_connection.node_id  # assuming NodeConnection has a node_id attribute
+                   
+                   #self.inbound_nodes[node_id] = (node_connection, address)
+                   self.inbound_nodes.add(node_connection)
+                   #node_connection.start()
             except socket.timeout:
                 pass
             except Exception as e:
@@ -98,7 +99,11 @@ class node(threading.Thread):
         node.send(message)
 
     def connect(self, node_host, node_port):
+        print(f"I am here with node port: {node_port}")
         
+        if node_host == self.node_host and node_port == self.node_port:
+            print("connect_with_node: Cannot connect with yourself!!")
+
         for node in self.outbound_nodes:
             if self.node_host == node_host and self.node_port == node_port:
                 print(f"Connected with this node {node_host.node_id} already")
@@ -108,9 +113,11 @@ class node(threading.Thread):
             connection.connect((node_host, node_port))
             #connection = socket.create_connection((node_host, node_port))
             node_connection = NodeConnection(self, connection, (node_host, node_port))
-            node_id = node_connection.node_id  # assuming NodeConnection has a node_id attribute
-            self.outbound_nodes[node_id] = (node_connection, (node_host, node_port))
             node_connection.start()
+
+            #node_id = node_connection.node_id  # assuming NodeConnection has a node_id attribute
+            #self.outbound_nodes[node_id] = (node_connection, (node_host, node_port))
+            self.outbound_nodes.add(node_connection)
         
         except Exception as e:
             self._log_debug("Connection failed with node: " + str(e))
@@ -128,10 +135,4 @@ class node(threading.Thread):
 
     def __repr__(self):
         return f'node: {self.node_host}:{self.node_id}:{self.node_id}'
-
-    def outbound_nodes_connect_disconnect(self, node_host):
-      raise NotImplementedError
-
-    def inbound_nodes_connect_disconnect(self, node_host):
-      raise NotImplementedError
     
