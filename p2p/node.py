@@ -1,5 +1,5 @@
 # ############################################
-# Created by: Shawn, Ashish
+# Created by: Shawn
 # Date      : 2023
 # Class     : CMSC 626
 # Project   : P2P
